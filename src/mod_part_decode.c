@@ -95,7 +95,7 @@ static int tab_lookup_num(const mem_code_tab *tab, const char *code) {
 #define FIELD_TAB(p, TAB, FI) p->field_meanings[FI] = tab_lookup(TAB, p->fields[FI]);
 
 static int match_samsung(mem_mod_data *p) {
-    int mc;
+    int mc, ddrv = 0;
 
     mem_code_tab forms[] = {
         {"3", "DIMM"}, {"4", "SODIMM"}, TAB_END
@@ -103,7 +103,18 @@ static int match_samsung(mem_mod_data *p) {
     mem_code_tab comp_type[] = {
         {"B", "DDR3"}, {"A", "DDR4"}, TAB_END
     };
-    mem_code_tab speeds[] = {
+    mem_code_tab mod_type_ddr3[] = {
+        {"71", "x64 204pin Unbuffered SODIMM"},
+        {"74", "x72 204pin ECC Unbuffered SODIMM"},
+        {"78", "x64 240pin Unbuffered DIMM"},
+        {"86", "x72 240pin LR DIMM"},
+        {"90", "x72 240pin VLP Unbuffered DIMM"},
+        {"91", "x72 240pin ECC Unbuffered DIMM"},
+        {"92", "x72 240pin VLP Registered DIMM"},
+        {"93", "x72 240pin Registered DIMM"},
+        TAB_END
+    };
+    mem_code_tab speeds_ddr3[] = {
         {"F7", "DDR3-800 (400MHz@CL=6, tRCD=6, tRP=6)"},
         {"F8", "DDR3-1066 (533MHz@CL=7, tRCD=7, tRP=7)"},
         {"H9", "DDR3-1333 (667MHz@CL=9, tRCD=9, tRP=9)"},
@@ -119,7 +130,7 @@ static int match_samsung(mem_mod_data *p) {
         {"4", "Montage Technology"},
         TAB_END
     };
-    mem_code_tab temp_power[] = {
+    mem_code_tab temp_power_ddr3[] = {
         /* num is millivolts */
         {"C", "Commercial (0-85C) 1.5V", 1500},
         {"Y", "Commercial (0-85C) Low VDD 1.35V", 1350},
@@ -154,7 +165,7 @@ static int match_samsung(mem_mod_data *p) {
 
     mc = sscanf(p->part_number,
         "M%1[34]"  // forms[]
-        "%2[0-9]"  // type
+        "%2[0-9]"  // mod_type[]
         "%1[BA]"   // comp_type[]
         "%2[0-9G]" // depths[]
         "%1[0-9]"    // # of bank in comp. interface -
@@ -173,8 +184,13 @@ static int match_samsung(mem_mod_data *p) {
         p->hit = mc;
         p->want = 12;
 
+        if (SEQ(p->fields[2], "A")) ddrv = 4;
+        else if (SEQ(p->fields[2], "B")) ddrv = 3;
+
         FIELD_TAB(p, forms, 0);
-        // [1] type p3-4
+        if (ddrv == 3) {
+            FIELD_TAB(p, mod_type_ddr3, 1);
+        }
         FIELD_TAB(p, comp_type, 2);
         FIELD_TAB(p, depths, 3);
         if (*p->fields[4]) {
@@ -191,13 +207,19 @@ static int match_samsung(mem_mod_data *p) {
             p->field_meanings[8] =
             mem_mod_add_str_printf(p, "pcbRev=%s", p->fields[8]);
         }
-        FIELD_TAB(p, temp_power, 9);
-        FIELD_TAB(p, speeds, 10);
+        if (ddrv == 3) {
+            FIELD_TAB(p, temp_power_ddr3, 9);
+            FIELD_TAB(p, speeds_ddr3, 10);
+        }
+
         FIELD_TAB(p, reg_vendors, 11);
 
         p->vendor = "Samsung";
         p->reg_vendor = p->field_meanings[11];
-        p->capacity_MiB = tab_lookup_num(depths, p->fields[3]) * tab_lookup_num(bit_org, p->fields[5]);
+
+
+        //NO :( -- p->capacity_MiB = tab_lookup_num(depths, p->fields[3]) * tab_lookup_num(bit_org, p->fields[5]);
+
         PROD_SET(p, ""); /* clear */
         PROD_CAT(p, p->field_meanings[2]);
         PROD_CAT(p, p->field_meanings[0]);

@@ -32,6 +32,7 @@ const char *test[] = {
     "M378B5773CH0-CH9", // Samsung DDR3 2G 1333 CL9
     "CT32M64S4W7E",
     "MT46V64M8TG-75",
+    "M393B2G70EB0-CK0",
     // Kingston decoder examples
     "KSM26RD4L/32HAI2",
     "KSM32SES4L/16HAI2", // fake
