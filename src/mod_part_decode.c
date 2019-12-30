@@ -229,24 +229,27 @@ static int match_samsung(mem_mod_data *p) {
 }
 
 static int match_ct(mem_mod_data *p) {
-    char c[10][4] = {};
     int mc;
+
+    mem_code_tab ddr_type[] = {
+        {"3", "DDR3"}, {"4", "DDR4"}, TAB_END
+    };
+
     mc = sscanf(p->part_number, "CT%[0-9]G%1[34]",
-        c[0], c[1]);
+        p->fields[0], p->fields[1]);
     if (mc == 2) {
         p->hit = mc;
+        p->want = 10; //
         p->vendor = "Crucial";
-        switch(*c[1]) {
-            case '3': PROD_SET(p, "DDR3 "); break;
-            case '4': PROD_SET(p, "DDR4 "); break;
-        }
+        FIELD_TAB(p, ddr_type, 1);
+
+        PROD_SET(p, ""); /* clear */
+        PROD_CAT(p, p->field_meanings[1]);
     }
     return p->hit;
 }
 
 static int match_ksm(mem_mod_data *p) {
-    char c[10][4] = {};
-    char tmp[100] = "";
     int mc;
 
     mem_code_tab speeds[] = {
@@ -280,26 +283,34 @@ static int match_ksm(mem_mod_data *p) {
     };
 
     mc = sscanf(p->part_number,"KSM%2[0-9]%1[ERL]%1[SDQ]%1[48]%1[L]/%[0-9]%1[HM]%1[ABE]%1[IMR]%[0-9]",
-            c[0], c[1], c[2], c[3], c[4], c[5], c[6], c[7], c[8], c[9] );
-    if (mc != 10)
+        p->fields[0], p->fields[1], p->fields[2], p->fields[3], p->fields[4],
+        p->fields[5], p->fields[6], p->fields[7], p->fields[8], p->fields[9] );
+    if (mc < 6)
     mc = sscanf(p->part_number,"KSM%2[0-9]%2[SE]%1[SDQ]%1[48]%1[L]/%[0-9]%1[HM]%1[ABE]%1[IMR]%[0-9]",
-            c[0], c[1], c[2], c[3], c[4], c[5], c[6], c[7], c[8], c[9] );
+        p->fields[0], p->fields[1], p->fields[2], p->fields[3], p->fields[4],
+        p->fields[5], p->fields[6], p->fields[7], p->fields[8], p->fields[9] );
     if (mc >= 6) {
+        FIELD_TAB(p, speeds, 0);
+        FIELD_TAB(p, forms, 1);
+        FIELD_TAB(p, ranks, 2);
+        //3,4
+        p->field_meanings[5] =
+        mem_mod_add_str_printf(p, "%sGiB", p->fields[5]);
+        FIELD_TAB(p, dram_vendors, 6);
+        if (*p->fields[7]) {
+            p->field_meanings[7] =
+            mem_mod_add_str_printf(p, "dieRev=%s", p->fields[7]);
+        }
+        FIELD_TAB(p, reg_vendors, 8);
+
         p->vendor = "Kingston";
         PROD_SET(p, "Server Premier DDR4 ");
-        PROD_CAT(p, tab_lookup(forms, c[1]));
-        PROD_CAT(p, tab_lookup(speeds, c[0]));
-        PROD_CAT(p, tab_lookup(ranks, c[2]));
-        p->ranks = tab_lookup_num(ranks, c[2]);
-        p->capacity_MiB = atoi(c[5]) * 1024;
-        const char *dv = tab_lookup(dram_vendors, c[6]);
-        if (dv) p->dram_vendor = dv;
-        if (*c[7]) {
-            sprintf(tmp, "dieRev=%s", c[7]);
-            PROD_CAT(p, tmp);
-        }
-        const char *rv = tab_lookup(reg_vendors, c[8]);
-        if (rv) p->reg_vendor = rv;
+
+        p->ranks = tab_lookup_num(ranks, p->fields[2]);
+        p->capacity_MiB = atoi(p->fields[5]) * 1024;
+        p->dram_vendor = p->field_meanings[6];
+        p->reg_vendor = p->field_meanings[8];
+
         p->hit = mc;
         p->want = 10;
     }
